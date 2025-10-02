@@ -1,28 +1,101 @@
 /*
-  # Fix RLS Policies for Leads and Messages Tables
+  # Diagnose and Fix Leads Assignment Issue
 
   ## Problem
-  Agents can currently see ALL leads in the database instead of only their assigned leads.
-  The existing RLS policies use `USING (true)` which allows unrestricted access.
+  Agent CLEMENCE sees all 8 leads instead of only her assigned 4 leads.
 
-  ## Solution
-  This migration replaces the overly permissive RLS policies with proper restrictions:
+  ## Root Cause
+  Need to check if the agent_id values in leads table match CLEMENCE's actual user ID.
 
-  ### Leads Table Security
-  - Agents can only SELECT their own assigned leads (where agent_id = their user id)
-  - Agents can only UPDATE leads assigned to them (status and notes only)
-  - Only system/admin can INSERT and DELETE leads
+  ## This Script Will:
+  1. Show all user accounts with their IDs
+  2. Show all leads with their agent_id assignments
+  3. Count leads per agent
+  4. Identify any mismatches
 
-  ### Messages Table Security
-  - Users can only SELECT messages where they are sender or recipient
-  - Users can only INSERT messages where they are the sender
-  - Users can only UPDATE messages where they are the recipient (for marking as read)
-  - Users cannot DELETE messages
+  ## Instructions
+  Run this in Supabase SQL Editor, then check the results to find the issue.
+*/
 
-  ## Important Notes
-  1. This will DROP the existing permissive policies
-  2. After running this, agents will only see their assigned leads
-  3. Admins using username='admin' will have full access via application logic
+-- ============================================
+-- DIAGNOSTIC QUERIES
+-- ============================================
+
+-- Step 1: Show all user accounts
+SELECT '=== USER ACCOUNTS ===' as info;
+SELECT
+  id,
+  username,
+  full_name,
+  role,
+  is_active,
+  created_at
+FROM user_accounts
+ORDER BY role DESC, full_name;
+
+-- Step 2: Show all leads with their assignments
+SELECT '=== ALL LEADS WITH AGENT ASSIGNMENTS ===' as info;
+SELECT
+  l.id,
+  l.name,
+  l.email,
+  l.agent_id,
+  u.full_name as assigned_agent_name,
+  u.username as assigned_agent_username,
+  l.status,
+  l.created_at
+FROM leads l
+LEFT JOIN user_accounts u ON l.agent_id = u.id
+ORDER BY l.created_at DESC;
+
+-- Step 3: Count leads per agent
+SELECT '=== LEADS COUNT PER AGENT ===' as info;
+SELECT
+  u.full_name as agent_name,
+  u.username,
+  u.id as agent_id,
+  COUNT(l.id) as total_leads,
+  STRING_AGG(l.name, ', ') as lead_names
+FROM user_accounts u
+LEFT JOIN leads l ON l.agent_id = u.id
+WHERE u.role = 'agent' AND u.is_active = true
+GROUP BY u.id, u.full_name, u.username
+ORDER BY u.full_name;
+
+-- Step 4: Check for orphaned leads
+SELECT '=== ORPHANED LEADS (invalid agent_id) ===' as info;
+SELECT
+  l.id,
+  l.name,
+  l.agent_id as invalid_agent_id,
+  l.email
+FROM leads l
+LEFT JOIN user_accounts u ON l.agent_id = u.id
+WHERE u.id IS NULL;
+
+/*
+  ============================================
+  AFTER RUNNING THE DIAGNOSTIC:
+  ============================================
+
+  1. Look at "USER ACCOUNTS" - Find CLEMENCE's actual UUID
+  2. Look at "ALL LEADS" - Check which 4 leads should belong to CLEMENCE
+  3. Look at "LEADS COUNT" - Verify the distribution
+  4. Look at "ORPHANED LEADS" - These have invalid agent_id values
+
+  If you find that CLEMENCE's leads have the wrong agent_id,
+  copy her correct ID from step 1, then use this UPDATE statement
+  (replace the values with actual ones):
+
+  Example fix:
+  UPDATE leads
+  SET agent_id = 'CLEMENCE_CORRECT_UUID_HERE'
+  WHERE id IN (
+    'lead_uuid_1',
+    'lead_uuid_2',
+    'lead_uuid_3',
+    'lead_uuid_4'
+  );
 */
 
 -- ============================================
