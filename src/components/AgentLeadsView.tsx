@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 
 export default function AgentLeadsView() {
   const { user } = useAuth();
+  console.log('👤 AgentLeadsView - Current user:', user);
   const { leads, loading, updateLead } = useLeads(user?.id);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('');

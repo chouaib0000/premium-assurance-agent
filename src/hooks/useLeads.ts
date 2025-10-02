@@ -22,15 +22,25 @@ export function useLeads(agentId?: string) {
   const fetchLeads = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching leads for agentId:', agentId);
+
       let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
 
       if (agentId) {
+        console.log('✅ Filtering leads by agent_id:', agentId);
         query = query.eq('agent_id', agentId);
+      } else {
+        console.log('⚠️ No agentId provided - fetching all leads');
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching leads:', error);
+        throw error;
+      }
+
+      console.log('📊 Fetched leads count:', data?.length, 'leads:', data);
       setLeads(data || []);
     } catch (error) {
       console.error('Error fetching leads:', error);
