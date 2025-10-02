@@ -91,7 +91,16 @@ export default function MessagingSystem() {
     e.preventDefault();
     if (!messageText.trim() || !selectedConversation) return;
 
-    await sendMessage(selectedConversation, messageText);
+    console.log('📤 Sending message to:', selectedConversation, 'content:', messageText);
+    const result = await sendMessage(selectedConversation, messageText);
+
+    if (result.error) {
+      console.error('❌ Failed to send message:', result.error);
+      alert('Failed to send message. Please try again.');
+      return;
+    }
+
+    console.log('✅ Message sent successfully:', result.data);
     setMessageText('');
     await loadConversations();
   };

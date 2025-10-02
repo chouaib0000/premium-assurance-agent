@@ -71,10 +71,13 @@ export function useMessages(recipientId?: string) {
   };
 
   useEffect(() => {
+    const authState = authService.getCurrentUser();
+    if (!authState.user?.id) return;
+
     fetchMessages();
 
     const channel = supabase
-      .channel('messages-changes')
+      .channel(`messages-changes-${authState.user.id}-${recipientId || 'all'}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
         fetchMessages();
       })
@@ -90,10 +93,19 @@ export function useMessages(recipientId?: string) {
       const authState = authService.getCurrentUser();
       const senderId = authState.user?.id;
 
+      console.log('🔐 Auth state in sendMessage:', { senderId, recipientId, hasContent: !!content });
+
       if (!senderId) {
+        console.error('❌ No sender ID - user not authenticated');
         throw new Error('User not authenticated');
       }
 
+      if (!recipientId) {
+        console.error('❌ No recipient ID provided');
+        throw new Error('Recipient ID is required');
+      }
+
+      console.log('💾 Inserting message into database...');
       const { data, error } = await supabase
         .from('messages')
         .insert([{
@@ -104,10 +116,15 @@ export function useMessages(recipientId?: string) {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Database error:', error);
+        throw error;
+      }
+
+      console.log('✅ Message inserted successfully:', data);
       return { data, error: null };
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('❌ Error sending message:', error);
       return { data: null, error };
     }
   };

@@ -43,7 +43,7 @@ export function useLeads(agentId?: string) {
     fetchLeads();
 
     const channel = supabase
-      .channel('leads-changes')
+      .channel(`leads-changes-${agentId || 'all'}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
         fetchLeads();
       })
